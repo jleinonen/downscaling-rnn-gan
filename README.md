@@ -1,4 +1,4 @@
-# Style-based GAN for geophysical fields
+# Stochastic, Recurrent Super-Resolution GAN for Downscaling Time-Evolving Atmospheric Fields
 
 This is a reference implementation of a stochastic, recurrent super-resolution GAN for downscaling time-evolving fields, intended for use in the weather and climate sciences domain. This code supports a paper to be submitted to IEEE Transactions in Geoscience and Remote Sensing.
 
