@@ -4,11 +4,11 @@ This is a reference implementation of a stochastic, recurrent super-resolution G
 
 ## Obtaining the data
 
-The radar precipitation dataset (MCH-RZC in the paper) can be downloaded at https://doi.org/10.7910/DVN/ZDWWMG by following the instructions there. The GOES cloud optical thickness dataset (GOES-COT) can be found [here](TBA).
+The radar precipitation dataset (MCH-RZC in the paper) can be downloaded at https://doi.org/10.7910/DVN/ZDWWMG by following the instructions there. The GOES cloud optical thickness dataset (GOES-COT) can be found [in this data repository](https://doi.org/10.5281/zenodo.3835849) as "goes-samples-2019-128x128.nc".
 
 ## Obtaining the trained network
 
-The trained generator weights selected for use in the paper are included in the `models` directory. The weights for the other time steps can be found in [TBA](TBA).
+The trained generator weights selected for use in the paper are included in the `models` directory. The weights for the other time steps can be found [here](https://doi.org/10.5281/zenodo.3835849).
 
 ## Running the code
 
