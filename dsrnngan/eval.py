@@ -12,6 +12,8 @@ import data
 import models
 import msssim
 import noise
+import plots
+import rainfarm
 
 
 path = os.path.dirname(os.path.abspath(__file__))
@@ -108,7 +110,7 @@ def rank_OP(norm_ranks, num_ranks=100):
 
 def rank_metrics_by_time(application, data_file, out_fn,
     weights_dir, check_every=1, N_range=None):
-    (wgan, batch_gen_train, batch_gen_valid,
+    (wgan, batch_gen_train, batch_gen_valid, batch_gen_test,
         noise_shapes, steps_per_epoch) = train.setup_gan(data_file,
         application=application, batch_size=64)
     gen = wgan.gen
@@ -147,7 +149,7 @@ def rank_metrics_by_time(application, data_file, out_fn,
 
 def rank_metrics_by_noise(application, run_id, data_file,
     weights_fn):
-    (wgan, batch_gen_train, batch_gen_valid,
+    (wgan, batch_gen_train, batch_gen_valid, _,
         noise_shapes, steps_per_epoch) = train.setup_gan(data_file,
         application=application)
     gen = wgan.gen
@@ -168,6 +170,45 @@ def rank_metrics_by_noise(application, run_id, data_file,
         std = ranks.std()
 
         print(N_samples, KS, CvM, DKL, CRPS, mean, std)
+
+
+def rank_metrics_table(application, data_file, weights_fn, method="gan"):
+
+    if method=="gan":
+        (wgan, batch_gen_train, batch_gen_valid, batch_gen_test,
+            noise_shapes, steps_per_epoch) = train.setup_gan(data_file,
+            test_data_file=data_file, application=application, batch_size=64)
+        gen = wgan.gen
+        gen.load_weights(weights_fn)
+    elif method=="rainfarm":
+        (gen_det, batch_gen_train, batch_gen_valid, 
+            batch_gen_test, steps_per_epoch) = train.setup_deterministic(data_file,
+            test_data_file=data_file, sample_random=True, n_samples=1, batch_size=64,
+            application=application, loss='mse')
+        gen = GeneratorRainFARM(16, batch_gen_test.decoder)
+        noise_shapes = lambda: []
+
+    noise_gen = noise.NoiseGenerator(noise_shapes(),
+        batch_size=batch_gen_valid.batch_size)
+
+    (ranks, crps_scores) = ensemble_ranks(gen, batch_gen_test,
+        noise_gen, num_batches=16)
+    
+    KS = rank_KS(ranks)
+    CvM = rank_CvM(ranks) 
+    DKL = rank_DKL(ranks)
+    OP = rank_OP(ranks)
+    CRPS = crps_scores.mean() 
+    mean = ranks.mean()
+    std = ranks.std()
+
+    print("KS: {:.3f}".format(KS))
+    print("CvM: {:.3f}".format(CvM))
+    print("DKL: {:.3f}".format(DKL))
+    print("OP: {:.3f}".format(OP))
+    print("CRPS: {:.3f}".format(CRPS))
+    print("mean: {:.3f}".format(mean))
+    print("std: {:.3f}".format(std))
 
 
 def reconstruct_time_series_partial(images_fn, gen, noise_shapes,
@@ -380,12 +421,10 @@ def image_quality(gen, batch_gen, noise_shapes, num_instances=1,
 
 def quality_metrics_by_time(application, data_fn, out_fn,
     weights_dir, check_every=1):
-    (wgan, batch_gen_train, batch_gen_valid,
+    (wgan, batch_gen_train, batch_gen_valid, _,
         noise_shapes, steps_per_epoch) = train.setup_gan(data_fn,
             application=application, batch_size=32)
     gen = wgan.gen
-    noise_gen = noise.NoiseGenerator(noise_shapes(),
-        batch_size=batch_gen_valid.batch_size)
 
     files = os.listdir(weights_dir)
     def get_app(fn):
@@ -405,3 +444,98 @@ def quality_metrics_by_time(application, data_fn, out_fn,
         (rmse, ssim, lsd) = image_quality(gen, batch_gen_valid, noise_shapes)
         log_line("{} {:.6f} {:.6f} {:.6f}".format(
             N_samples, rmse.mean(), ssim.mean(), np.nanmean(lsd)))
+
+
+def quality_metrics_table(application, data_fn, weights_fn, method="gan"):
+    if method == "gan":
+        (wgan, batch_gen_train, batch_gen_valid, batch_gen_test,
+            noise_shapes, steps_per_epoch) = train.setup_gan(data_fn,
+                test_data_file=data_fn, application=application, batch_size=32)
+        gen = wgan.gen
+        gen.load_weights(weights_fn)
+    elif method == "gen_det":
+        (gen_det, batch_gen_train, batch_gen_valid, 
+            batch_gen_test, steps_per_epoch) = train.setup_deterministic(data_fn,
+            test_data_file=data_fn, sample_random=True, n_samples=1, batch_size=32,
+            application=application, loss='mse')
+        gen_det.load_weights(weights_fn)
+        gen = GeneratorDeterministicPlaceholder(gen_det)
+        noise_shapes = lambda s: []
+    elif method == "lanczos":
+        (gen_det, batch_gen_train, batch_gen_valid, 
+            batch_gen_test, steps_per_epoch) = train.setup_deterministic(data_fn,
+            test_data_file=data_fn, sample_random=True, n_samples=1, batch_size=32,
+            application=application, loss='mse')
+        gen = GeneratorLanczos((128,128))
+        noise_shapes = lambda s: []
+    elif method == "rainfarm":
+        (gen_det, batch_gen_train, batch_gen_valid, 
+            batch_gen_test, steps_per_epoch) = train.setup_deterministic(data_fn,
+            test_data_file=data_fn, sample_random=True, n_samples=1, batch_size=32,
+            application=application, loss='mse')
+        gen = GeneratorRainFARM(16, batch_gen_test.decoder)
+        noise_shapes = lambda s: []
+
+    (rmse, ssim, lsd) = image_quality(gen, batch_gen_test, noise_shapes)
+
+    print("RMSE: {:.3f}".format(rmse.mean()))
+    print("MSSSIM: {:.3f}".format(ssim.mean()))
+    print("LSD: {:.3f}".format(np.nanmean(lsd)))
+
+
+class GeneratorLanczos:
+    # class that can be used in place of a generator for evaluation purposes,
+    # using Lanczos filtering
+    def __init__(self, out_size):
+        self.out_size = out_size
+
+    def predict(self, *args):
+        y = args[0][0]
+        out_shape = y.shape[:2] + self.out_size + y.shape[4:]
+        x = np.zeros(out_shape, dtype=y.dtype)
+        for i in range(x.shape[0]):
+            for k in range(x.shape[1]):
+                x[i,k,:,:,0] = plots.resize_lanczos(y[i,k,:,:,0],
+                    self.out_size)
+        return x
+
+
+class GeneratorDeterministicPlaceholder:
+    def __init__(self, gen_det):
+        self.gen_det = gen_det
+
+    def predict(self, *args):
+        y = args[0]
+        return self.gen_det.predict(y)
+
+
+class GeneratorRainFARM:
+    def __init__(self, ds_factor, decoder):
+        self.ds_factor = ds_factor
+        self.decoder = decoder
+        self.batches = 0
+
+    def predict(self, *args):
+        print(self.batches)
+        self.batches += 1
+        y = args[0][0]
+        y = self.decoder.denormalize(y)
+        P = 10**y
+        P[~np.isfinite(P)] = 0
+
+        out_size = (y.shape[2]*self.ds_factor, y.shape[3]*self.ds_factor)
+        out_shape = y.shape[:2] + out_size + y.shape[4:]
+        x = np.zeros(out_shape, dtype=y.dtype)
+
+        for i in range(y.shape[0]):
+            alpha = rainfarm.get_alpha_seq(P[i,...,0])
+            r = [rainfarm.rainfarm_downscale(p, alpha=alpha, threshold=0.1, 
+                ds_factor=self.ds_factor) for p in P[0,...,0]]
+            log_r = np.log10(r)
+            log_r[~np.isfinite(log_r)] = np.nan
+            log_r = self.decoder.normalize(log_r)
+            log_r[~np.isfinite(log_r)] = 0.0
+            x[i,...,0] = log_r
+            x = x.clip(0,1)
+
+        return x

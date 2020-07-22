@@ -19,6 +19,8 @@ if __name__ == "__main__":
     parser.add_argument('mode', type=str, help="train or plot")
     parser.add_argument('--data_file', type=str, 
         help="Training data file")
+    parser.add_argument('--test_data_file', type=str, default="",
+        help="Test data file")
     parser.add_argument('--application', type=str, default="mchrzc",
         help="Network weights file root to load")
     parser.add_argument('--load_weights_root', type=str, default="",
@@ -59,7 +61,7 @@ if __name__ == "__main__":
             save_weights_root = path + "../models/downscaleseqgan"
 
         # initialize GAN
-        (wgan, batch_gen_train, batch_gen_valid, noise_shapes, _) = \
+        (wgan, batch_gen_train, batch_gen_valid, _, noise_shapes, _) = \
             train.setup_gan(data_fn, 
                 batch_size=batch_size, application=application)
 

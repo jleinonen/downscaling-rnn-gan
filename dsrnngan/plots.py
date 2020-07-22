@@ -11,8 +11,13 @@ from matplotlib import colorbar, colors, gridspec
 import netCDF4
 import numpy as np
 import pandas as pd
+try:
+    from PIL import Image
+except ImportError:
+    pass # to allow loading on setups witout PIL
 
 import data
+import models
 import noise
 import train
 
@@ -161,6 +166,7 @@ def plot_quality_metrics_by_samples(quality_metrics_fn,
             y = y/50
         if metric=="CRPS":
             y = y*10
+            label = "CRPS $\\times$ 10"
         ax.plot(x, y, label=label, linestyle=linestyle)
 
     ax.set_xlim((0,x.max()))
@@ -294,56 +300,56 @@ def plot_sequences_horiz(gen, noise_shapes, batch_gen,
 
 
 def plot_examples_mchrzc(data_fn, weights_fn, plot_fn):
-    (wgan, batch_gen_train, batch_gen_valid, noise_shapes,
-        steps_per_epoch) = train.setup_gan(data_fn,
-        sample_random=True, n_samples=1024, application='mchrzc',
+    (wgan, batch_gen_train, batch_gen_valid, batch_gen_test, noise_shapes,
+        steps_per_epoch) = train.setup_gan(data_fn, test_data_file=data_fn,
+        sample_random=True, n_samples=1, application='mchrzc',
         random_seed=1234)
     gen = wgan.gen
     gen.load_weights(weights_fn)
-    plot_sequences_horiz(gen, noise_shapes, batch_gen_valid, samples=[10,5,8],
+    plot_sequences_horiz(gen, noise_shapes, batch_gen_test, samples=[0,21,15],
         application='mchrzc', plot_stride=1)
     plt.savefig(plot_fn, bbox_inches='tight')
     plt.close()
 
 
 def plot_examples_goescod(data_fn, weights_fn, plot_fn):
-    (wgan, batch_gen_train, batch_gen_valid, noise_shapes,
-        steps_per_epoch) = train.setup_gan(data_fn,
-        sample_random=True, n_samples=1024, application='goescod',
+    (wgan, batch_gen_train, batch_gen_valid, batch_gen_test, noise_shapes,
+        steps_per_epoch) = train.setup_gan(data_fn, test_data_file=data_fn,
+        sample_random=True, n_samples=1, application='goescod',
         random_seed=1234)
     gen = wgan.gen
     gen.load_weights(weights_fn)
-    plot_sequences_horiz(gen, noise_shapes, batch_gen_valid, samples=[35,6,21],
+    plot_sequences_horiz(gen, noise_shapes, batch_gen_test, samples=[0,1,2],
         application='goescod', plot_stride=1)
     plt.savefig(plot_fn, bbox_inches='tight')
     plt.close()
 
 
 def plot_examples_mchrzc_random(data_fn, weights_fn, plot_dir, num_examples=16):
-    (wgan, batch_gen_train, batch_gen_valid, noise_shapes,
-        steps_per_epoch) = train.setup_gan(data_fn,
-        sample_random=True, n_samples=1024, application='mchrzc',
+    (wgan, batch_gen_train, batch_gen_valid, batch_gen_test, noise_shapes,
+        steps_per_epoch) = train.setup_gan(data_fn, test_data_file=data_fn,
+        sample_random=True, n_samples=1, application='mchrzc',
         random_seed=2345)
     gen = wgan.gen
     gen.load_weights(weights_fn)
     for k in range(num_examples):
         plot_fn = plot_dir + "/examples-mchrzc-random-{:02d}.pdf".format(k)
-        plot_sequences_horiz(gen, noise_shapes, batch_gen_valid, samples=[k],
+        plot_sequences_horiz(gen, noise_shapes, batch_gen_test, samples=[k],
             application='mchrzc', plot_stride=1, num_instances=12)
         plt.savefig(plot_fn, bbox_inches='tight')
         plt.close()
 
 
 def plot_examples_goescod_random(data_fn, weights_fn, plot_dir, num_examples=16):
-    (wgan, batch_gen_train, batch_gen_valid, noise_shapes,
-        steps_per_epoch) = train.setup_gan(data_fn,
-        sample_random=True, n_samples=1024, application='goescod',
+    (wgan, batch_gen_train, batch_gen_valid, batch_gen_test, noise_shapes,
+        steps_per_epoch) = train.setup_gan(data_fn, test_data_file=data_fn,
+        sample_random=True, n_samples=1, application='goescod',
         random_seed=2345)
     gen = wgan.gen
     gen.load_weights(weights_fn)
     for k in range(num_examples):
         plot_fn = plot_dir + "/examples-goescod-random-{:02d}.pdf".format(k)
-        plot_sequences_horiz(gen, noise_shapes, batch_gen_valid, samples=[k],
+        plot_sequences_horiz(gen, noise_shapes, batch_gen_test, samples=[k],
             application='goescod', plot_stride=1, num_instances=12)
         plt.savefig(plot_fn, bbox_inches='tight')
         plt.close()
@@ -499,7 +505,8 @@ def plot_video_frames_all(images_fn, gen_fn, out_dir,
                 plt.close()
 
 
-def plot_rank_histogram(ax, ranks, N_ranks=101, label=None, linestyle='-'):
+def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
+
     bc = np.linspace(0,1,N_ranks)
     db = (bc[1]-bc[0])
     bins = bc-db/2
@@ -507,10 +514,11 @@ def plot_rank_histogram(ax, ranks, N_ranks=101, label=None, linestyle='-'):
     (h,_) = np.histogram(ranks,bins=bins)
     h = h / h.sum()
 
-    ax.plot(bc,h,label=label,linestyle=linestyle)
+    ax.plot(bc,h,**plot_params)
 
 
-def plot_rank_cdf(ax, ranks, N_ranks=101, label=None, linestyle='-'):
+def plot_rank_cdf(ax, ranks, N_ranks=101, **plot_params):
+
     bc = np.linspace(0,1,N_ranks)
     db = (bc[1]-bc[0])
     bins = bc-db/2
@@ -519,7 +527,7 @@ def plot_rank_cdf(ax, ranks, N_ranks=101, label=None, linestyle='-'):
     h = h.cumsum()
     h = h / h[-1]
 
-    ax.plot(bc,h,label=label,linestyle=linestyle)
+    ax.plot(bc,h,**plot_params)
 
 
 def plot_rank_histogram_all(rank_files, labels, N_ranks=101):
@@ -527,14 +535,19 @@ def plot_rank_histogram_all(rank_files, labels, N_ranks=101):
     plt.subplots_adjust(hspace=0.15)
 
     linestyles = ["-","--"]
+    colors = ["C0", "C1"]
 
-    for (fn,label,ls) in zip(rank_files,labels,linestyles):
-        with np.load(fn) as f:
+    for ((fn_valid,fn_test),label,ls,c) in zip(rank_files,labels,linestyles,colors):
+        with np.load(fn_test, allow_pickle=True) as f:
+            ranks = f['arr_0'].item()['ranks']
+        plot_rank_histogram(axes[0], ranks, N_ranks=N_ranks,
+            label=label, linestyle=ls, linewidth=2, c=c, alpha=0.7, zorder=1)
+        with np.load(fn_valid) as f:
             ranks = f['arr_0']
         plot_rank_histogram(axes[0], ranks, N_ranks=N_ranks,
-            label=label, linestyle=ls)
+            label=None, linestyle=ls, linewidth=0.75, c=c, zorder=2)
     bc = np.linspace(0,1,N_ranks)
-    axes[0].plot(bc, [1./N_ranks]*len(bc), linestyle=':', label="Uniform")
+    axes[0].plot(bc, [1./N_ranks]*len(bc), linestyle=':', label="Uniform", c='C2', zorder=0)
     axes[0].set_ylabel("Norm. occurrence")
     ylim = axes[0].get_ylim()
     axes[0].set_ylim((0,ylim[1]))
@@ -543,12 +556,16 @@ def plot_rank_histogram_all(rank_files, labels, N_ranks=101):
         horizontalalignment='left', verticalalignment='top',
         transform=axes[0].transAxes)
 
-    for (fn,label,ls) in zip(rank_files,labels,linestyles):
-        with np.load(fn) as f:
+    for ((fn_valid,fn_test),label,ls,c) in zip(rank_files,labels,linestyles,colors):
+        with np.load(fn_test, allow_pickle=True) as f:
+            ranks = f['arr_0'].item()['ranks']
+        plot_rank_cdf(axes[1], ranks, N_ranks=N_ranks,
+            label=label, linestyle=ls, linewidth=2, c=c, alpha=0.7, zorder=1)
+        with np.load(fn_valid) as f:
             ranks = f['arr_0']
         plot_rank_cdf(axes[1], ranks, N_ranks=N_ranks,
-            label=label, linestyle=ls)
-    axes[1].plot(bc,bc,linestyle=':', label="Uniform")
+            label=None, linestyle=ls, linewidth=0.75, c=c, zorder=2)
+    axes[1].plot(bc,bc,linestyle=':', label="Uniform", c='C2', zorder=0)
     axes[1].set_ylabel("CDF")
     axes[1].set_xlabel("Normalized rank")
     axes[1].set_ylim(0,1)
@@ -569,9 +586,10 @@ def plot_all(
         goescod_quality_metrics_fn="../data/quality_metrics_by_time-goescod.txt",
         mchrzc_rank_metrics_fn="../data/rank_metrics_by_time-mchrzc.txt",
         goescod_rank_metrics_fn="../data/rank_metrics_by_time-goescod.txt",
-        mchrzc_rank_samples_fn="../data/ranks-mchrzc-361600.npz",
-        goescod_rank_samples_fn="../data/ranks-goescod-371200.npz"
-
+        mchrzc_rank_samples_valid_fn="../data/ranks-mchrzc-361600-valid.npz",
+        mchrzc_rank_samples_test_fn="../data/ranks-mchrzc-361600-test.npz",
+        goescod_rank_samples_valid_fn="../data/ranks-goescod-371200-valid.npz",
+        goescod_rank_samples_test_fn="../data/ranks-goescod-371200-test.npz"
     ):
 
     plot_examples_mchrzc(
@@ -614,7 +632,97 @@ def plot_all(
     plt.close()
 
     plot_rank_histogram_all(
-        [mchrzc_rank_samples_fn, goescod_rank_samples_fn],
+        [
+            (mchrzc_rank_samples_valid_fn,mchrzc_rank_samples_test_fn), 
+            (goescod_rank_samples_valid_fn,goescod_rank_samples_test_fn), 
+        ],
         ["MCH-RZC", "GOES-COT"]
     )
+    plt.savefig("{}/rank-distribution.pdf".format(figs_dir),
+        bbox_inches='tight')
     plt.close()
+
+    plots.plot_comparison("/data/nowgan/test-samples-2017-128x128.nc", 
+        "../models/gen_weights-mchrzc-0361600.h5", 
+        "../models/gen_det_weights-mse.h5", random_seed=16)
+    plt.savefig("../figures/comparison.pdf", bbox_inches='tight')
+    plt.close()
+
+
+def resize_lanczos(img, size):
+    return np.array(Image.fromarray(img).resize(size, resample=Image.LANCZOS))
+
+
+def plot_comparison(test_data_file, gen_gan_weights, gen_det_mse_weights,
+    application="mchrzc", random_seed=None):
+
+    (_, _, batch_gen) = train.setup_batch_gen(
+        test_data_file, test_data_file=test_data_file,
+        application=application, random_seed=random_seed,
+        batch_size=1
+    )
+
+    old_batch_size = batch_gen.batch_size
+    try:
+        batch_gen.batch_size = 1
+        (seq_real, cond) = next(batch_gen)
+    finally:
+        batch_gen.batch_size = old_batch_size
+
+    size = tuple(seq_real.shape[2:4])
+    seq_lanczos = np.array([resize_lanczos(x, size) for x in cond[0,...,0]])
+
+    (gen, _) = models.generator()
+    init_model = models.initial_state_model()
+    (gen_gan, noise_shapes) = models.generator_initialized(
+        gen, init_model)
+    gen_det = models.generator_deterministic(gen_gan)
+
+    noise = [np.random.randn(*((1,)+s)) for s in noise_shapes(size)]
+    gen_gan.load_weights(gen_gan_weights)
+    seq_gan = gen_gan.predict([cond]+noise)
+    gen_det.load_weights(gen_det_mse_weights)
+    seq_mse = gen_det.predict(cond)
+
+    seq_real = batch_gen.decoder.denormalize(seq_real)
+    cond = batch_gen.decoder.denormalize(cond)
+    seq_lanczos = batch_gen.decoder.denormalize(seq_lanczos)
+    seq_mse = batch_gen.decoder.denormalize(seq_mse)
+    seq_gan = batch_gen.decoder.denormalize(seq_gan)
+
+    import rainfarm
+    P = 10**cond
+    P[~np.isfinite(P)] = 0
+    alpha = rainfarm.get_alpha_seq(P[0,...,0])
+    print(alpha)
+    r = [rainfarm.rainfarm_downscale(p, alpha=alpha, threshold=0.1)
+        for p in P[0,...,0]]
+    log_r = np.log10(r)
+    log_r[~np.isfinite(log_r)] = np.nan
+
+    sequences = [
+        seq_real[0,...,0],
+        cond[0,...,0],
+        seq_lanczos,
+        seq_mse[0,...,0],
+        log_r,
+        seq_gan[0,...,0]
+    ]
+    labels = [
+        "Real", "Downsampled", "Lanczos", "Det. RCNN", "RainFARM", "GAN"
+    ]
+
+    num_cols = seq_real.shape[1]
+    num_rows = len(sequences)
+    plt.figure(figsize=(1.5*num_cols,1.5*num_rows))
+
+    gs = gridspec.GridSpec(num_rows,num_cols,wspace=0.05,hspace=0.05)
+    
+    for k in range(seq_real.shape[1]):
+        for i in range(num_rows):
+            plt.subplot(gs[i,k])
+            plot_img(sequences[i][k,:,:])
+            if k==0:
+                plt.ylabel(labels[i])
+
+    gc.collect()

@@ -110,6 +110,28 @@ def generator_initialized(gen, init_model,
     return (model, noise_shapes)
 
 
+def generator_deterministic(gen_init, num_channels=1, num_timesteps=8):
+    lores_in = Input(shape=(num_timesteps,None,None,num_channels),
+        name="cond_in")
+
+    def zeros_noise(input, which):
+        shape = tf.shape(input)
+        if which == 'init':
+            shape = tf.stack([shape[0],shape[1],shape[2],8])
+        elif which == 'update':
+            shape = tf.stack([shape[0],num_timesteps,shape[1],shape[2],8])
+        return tf.fill(shape, 0.0)
+
+    init_zeros = Lambda(lambda x: zeros_noise(x, 'init'))(lores_in)
+    update_zeros = Lambda(lambda x: zeros_noise(x, 'update'))(lores_in)
+    img_out = gen_init([lores_in, init_zeros, update_zeros])
+
+    model = Model(inputs=lores_in, outputs=img_out)
+
+    return model
+
+
+
 def discriminator(num_channels=1, num_timesteps=8):
     hires_in = Input(shape=(num_timesteps,None,None,num_channels), name="sample_in")
     lores_in = Input(shape=(num_timesteps,None,None,num_channels), name="cond_in")
