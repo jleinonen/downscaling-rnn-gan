@@ -1,6 +1,6 @@
 # Stochastic, Recurrent Super-Resolution GAN for Downscaling Time-Evolving Atmospheric Fields
 
-This is a reference implementation of a stochastic, recurrent super-resolution GAN for downscaling time-evolving fields, intended for use in the weather and climate sciences domain. This code supports a paper to be submitted to IEEE Transactions in Geoscience and Remote Sensing.
+This is a reference implementation of a stochastic, recurrent super-resolution GAN for downscaling time-evolving fields, intended for use in the weather and climate sciences domain. This code supports the paper "Stochastic Super-Resolution for Downscaling Time-Evolving Atmospheric Fields With a Generative Adversarial Network", IEEE Transactions in Geoscience and Remote Sensing, 2020, https://doi.org/10.1109/TGRS.2020.3032790, the accepted version is available at https://arxiv.org/abs/2005.10374.
 
 ## Obtaining the data
 
