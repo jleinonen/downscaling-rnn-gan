@@ -44,7 +44,6 @@ def ensemble_ranks(gen, batch_gen, noise_gen,
         randomize_nans(sample, batch_gen.decoder.below_val, rnd_range)
 
         samples_gen = []
-        crps_scores = []
         for i in range(rank_samples):
             n = noise_gen()
             for nn in n:
