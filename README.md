@@ -22,9 +22,9 @@ If you want the simplest way to run the code, the following two options are avai
 
 You can replicate the plots in the paper (except for Fig. 7 for which we unfortunately cannot release the source data) by going to the `dsrnngan` directory and using
 ```
-python main.py plot --mchrzc_data_file=<mchrzc_data_file> --goescod_data_file=<<mchrzc_data_file>>
+python main.py plot --mchrzc_data_file=<mchrzc_data_file> --goescod_data_file=<goescod_data_file>
 ```
-where `<mchrzc_data_file>` is the path to the radar precipitation dataset and `<<mchrzc_data_file>` is the path to the GOES cloud optical thickness dataset. For more control over the plotting process, see the function `plot_all` in `plots.py`.
+where `<mchrzc_data_file>` is the path to the radar precipitation dataset and `<goescod_data_file>` is the path to the GOES cloud optical thickness dataset. For more control over the plotting process, see the function `plot_all` in `plots.py`.
 
 ### Training the model
 
